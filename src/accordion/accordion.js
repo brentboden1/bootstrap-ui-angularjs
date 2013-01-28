@@ -1,11 +1,18 @@
-angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse']);
-angular.module('ui.bootstrap.accordion').controller('AccordionController', ['$scope', '$attrs', function ($scope, $attrs) {
+angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
+
+.constant('accordionConfig', {
+  closeOthers: true
+})
+
+.controller('AccordionController', ['$scope', '$attrs', 'accordionConfig', function ($scope, $attrs, accordionConfig) {
+  
   // This array keeps track of the accordion groups
   this.groups = [];
 
   // Ensure that all the groups in this accordion are closed, unless close-others explicitly says not to
   this.closeOthers = function(openGroup) {
-    if ( angular.isUndefined($attrs.closeOthers) || $scope.$eval($attrs.closeOthers) ) {
+    var closeOthers = angular.isDefined($attrs.closeOthers) ? $scope.$eval($attrs.closeOthers) : accordionConfig.closeOthers;
+    if ( closeOthers ) {
       angular.forEach(this.groups, function (group) {
         if ( group !== openGroup ) {
           group.isOpen = false;
@@ -38,7 +45,7 @@ angular.module('ui.bootstrap.accordion').controller('AccordionController', ['$sc
 // and adds an accordion CSS class to itself element.
 angular.module('ui.bootstrap.accordion').directive('accordion', function () {
   return {
-    restrict:'E',
+    restrict:'EA',
     controller:'AccordionController',
     transclude: true,
     replace: false,
@@ -50,7 +57,7 @@ angular.module('ui.bootstrap.accordion').directive('accordion', function () {
 angular.module('ui.bootstrap.accordion').directive('accordionGroup', ['$parse', '$transition', '$timeout', function($parse, $transition, $timeout) {
   return {
     require:'^accordion',         // We need this directive to be inside an accordion
-    restrict:'E',                 // It will be an element
+    restrict:'EA',
     transclude:true,              // It transcludes the contents of the directive into the template
     replace: true,                // The element containing the directive will be replaced with the template
     templateUrl:'template/accordion/accordion-group.html',
