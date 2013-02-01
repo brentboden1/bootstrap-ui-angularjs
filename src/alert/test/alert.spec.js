@@ -37,11 +37,22 @@ describe("alert", function () {
     expect(alerts.length).toEqual(3);
   });
 
-  it("should use correct alert type", function () {
+  it("should use correct classes for different alert types", function () {
     var alerts = createAlerts();
     expect(alerts.eq(0)).toHaveClass('alert-success');
     expect(alerts.eq(1)).toHaveClass('alert-error');
-    expect(alerts.eq(2)).toHaveClass('alert-info');
+
+    //defaults
+    expect(alerts.eq(2)).toHaveClass('alert');
+    expect(alerts.eq(2)).not.toHaveClass('alert-info');
+    expect(alerts.eq(2)).not.toHaveClass('alert-block');
+  });
+
+  it('it should be possible to add additional classes for alert', function () {
+    var element = $compile('<alert class="alert-block" type="\'info\'">Default alert!</alert>')(scope);
+    scope.$digest();
+    expect(element).toHaveClass('alert-block');
+    expect(element).toHaveClass('alert-info');
   });
 
   it("should fire callback when closed", function () {
