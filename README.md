@@ -26,12 +26,12 @@ In fact we are fortunate enough to **benefit from the same testing infrastructur
 
 ## Contributing to the project
 
-We are always looking for the quality contributions! Please check the [CONTRIBUTING.md](bootstrap/blob/master/CONTRIBUTING.md) for the contribution guidelines.
+We are always looking for the quality contributions! Please check the [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution guidelines.
 
 ### Development
 #### Prepare your environment
 * Install [Node.js](http://nodejs.org/) and NPM (should come with)
-* Install global dev dependencies: `npm install -g grunt testacular`
+* Install global dev dependencies: `npm install -g grunt-cli testacular`
 * Instal local dev dependencies: `npm install` while current directory is bootstrap repo
 
 #### Run unit tests
@@ -45,11 +45,12 @@ We are always looking for the quality contributions! Please check the [CONTRIBUT
 * Bump up version number in `package.json`
 * Commit the version change with the following message: `chore(release): [versio number]`
 * tag
-* push changes with a tag: `git push --tags`
+* push changes and a tag (`git push --tags`)
 * switch to the `gh-pages` branch: `git checkout gh-pages`
 * copy content of the dist folder to the main folder
 * Commit the version change with the following message: `chore(release): [versio number]`
-* tag
-* push changes with a tag: `git push --tags`
+* push changes
+* switch back to the `main branch` and modify `package.json` to bump up version for the next iteration
+* commit (`chore(release): starting [versio number]`) and push
 
 Well done! (If you don't like repeating yourself open a PR with a grunt task taking care of the above!)
