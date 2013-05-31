@@ -20,7 +20,6 @@ dialogModule.provider("$dialog", function(){
     backdropClass: 'modal-backdrop',
     transitionClass: 'fade',
     triggerClass: 'in',
-    dialogOpenClass: 'modal-open',  
     resolve:{},
     backdropFade: false,
     dialogFade:false,
@@ -66,6 +65,7 @@ dialogModule.provider("$dialog", function(){
 		function Dialog(opts) {
 
       var self = this, options = this.options = angular.extend({}, defaults, globalOptions, opts);
+      this._open = false;
 
       this.backdropEl = createElement(options.backdropClass);
       if(options.backdropFade){
@@ -91,6 +91,10 @@ dialogModule.provider("$dialog", function(){
         self.close();
         e.preventDefault();
         self.$scope.$apply();
+      };
+
+      this.handleLocationChange = function() {
+        self.close();
       };
     }
 
@@ -122,12 +126,11 @@ dialogModule.provider("$dialog", function(){
 
         if (self.options.controller) {
           var ctrl = $controller(self.options.controller, locals);
-          self.modalEl.contents().data('ngControllerController', ctrl);
+          self.modalEl.children().data('ngControllerController', ctrl);
         }
 
         $compile(self.modalEl)($scope);
         self._addElementsToDom();
-        body.addClass(self.options.dialogOpenClass);
 
         // trigger tranisitions
         setTimeout(function(){
@@ -147,7 +150,6 @@ dialogModule.provider("$dialog", function(){
       var self = this;
       var fadingElements = this._getFadingElements();
 
-      body.removeClass(self.options.dialogOpenClass);
       if(fadingElements.length > 0){
         for (var i = fadingElements.length - 1; i >= 0; i--) {
           $transition(fadingElements[i], removeTriggerClass).then(onCloseComplete);
@@ -183,6 +185,8 @@ dialogModule.provider("$dialog", function(){
     Dialog.prototype._bindEvents = function() {
       if(this.options.keyboard){ body.bind('keydown', this.handledEscapeKey); }
       if(this.options.backdrop && this.options.backdropClick){ this.backdropEl.bind('click', this.handleBackDropClick); }
+
+      this.$scope.$on('$locationChangeSuccess', this.handleLocationChange);
     };
 
     Dialog.prototype._unbindEvents = function() {

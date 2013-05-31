@@ -1,4 +1,4 @@
-angular.module('ui.bootstrap.typeahead', [])
+angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
 
 /**
  * A helper service that can parse typeahead's syntax (string provided by users)
@@ -29,8 +29,7 @@ angular.module('ui.bootstrap.typeahead', [])
   };
 }])
 
-  //options - min length
-  .directive('typeahead', ['$compile', '$q', 'typeaheadParser', function ($compile, $q, typeaheadParser) {
+  .directive('typeahead', ['$compile', '$parse', '$q', '$document', '$position', 'typeaheadParser', function ($compile, $parse, $q, $document, $position, typeaheadParser) {
 
   var HOT_KEYS = [9, 13, 27, 38, 40];
 
@@ -38,13 +37,28 @@ angular.module('ui.bootstrap.typeahead', [])
     require:'ngModel',
     link:function (originalScope, element, attrs, modelCtrl) {
 
-      var selected = modelCtrl.$modelValue;
+      var selected;
 
       //minimal no of characters that needs to be entered before typeahead kicks-in
       var minSearch = originalScope.$eval(attrs.typeaheadMinLength) || 1;
 
       //expressions used by typeahead
       var parserResult = typeaheadParser.parse(attrs.typeahead);
+
+      //should it restrict model values to the ones selected from the popup only?
+      var isEditable = originalScope.$eval(attrs.typeaheadEditable) !== false;
+
+      var isLoadingSetter = $parse(attrs.typeaheadLoading).assign || angular.noop;
+
+      //pop-up element used to display matches
+      var popUpEl = angular.element(
+        "<typeahead-popup " +
+          "matches='matches' " +
+          "active='activeIdx' " +
+          "select='select(activeIdx)' "+
+          "query='query' "+
+          "position='position'>"+
+        "</typeahead-popup>");
 
       //create a child scope for the typeahead directive so we are not polluting original scope
       //with typeahead-specific data (matches, query etc.)
@@ -61,6 +75,7 @@ angular.module('ui.bootstrap.typeahead', [])
       var getMatchesAsync = function(inputValue) {
 
         var locals = {$viewValue: inputValue};
+        isLoadingSetter(originalScope, true);
         $q.when(parserResult.source(scope, locals)).then(function(matches) {
 
           //it might happen that several async queries were in progress if a user were typing fast
@@ -81,12 +96,21 @@ angular.module('ui.bootstrap.typeahead', [])
               }
 
               scope.query = inputValue;
+              //position pop-up with matches - we need to re-calculate its position each time we are opening a window
+              //with matches as a pop-up might be absolute-positioned and position of an input might have changed on a page
+              //due to other elements being rendered
+              scope.position = $position.position(element);
+              scope.position.top = scope.position.top + element.prop('offsetHeight');
 
             } else {
               resetMatches();
             }
+            isLoadingSetter(originalScope, false);
           }
-        }, resetMatches);
+        }, function(){
+          resetMatches();
+          isLoadingSetter(originalScope, false);
+        });
       };
 
       resetMatches();
@@ -95,7 +119,7 @@ angular.module('ui.bootstrap.typeahead', [])
       scope.query = undefined;
 
       //plug into $parsers pipeline to open a typeahead on view changes initiated from DOM
-      //$parsers kick-in on all the changes coming from the vview as well as manually triggered by $setViewValue
+      //$parsers kick-in on all the changes coming from the view as well as manually triggered by $setViewValue
       modelCtrl.$parsers.push(function (inputValue) {
 
         resetMatches();
@@ -107,12 +131,12 @@ angular.module('ui.bootstrap.typeahead', [])
           }
         }
 
-        return undefined;
+        return isEditable ? inputValue : undefined;
       });
 
       modelCtrl.$render = function () {
         var locals = {};
-        locals[parserResult.itemName] = selected;
+        locals[parserResult.itemName] = selected || modelCtrl.$viewValue;
         element.val(parserResult.viewMapper(scope, locals) || modelCtrl.$viewValue);
         selected = undefined;
       };
@@ -126,7 +150,7 @@ angular.module('ui.bootstrap.typeahead', [])
         modelCtrl.$render();
       };
 
-      //bind keyboard events: arrows up(38) / down(40), enter(13) and tab(9), esc(9)
+      //bind keyboard events: arrows up(38) / down(40), enter(13) and tab(9), esc(27)
       element.bind('keydown', function (evt) {
 
         //typeahead is open and an "interesting" key was pressed
@@ -150,14 +174,19 @@ angular.module('ui.bootstrap.typeahead', [])
           });
 
         } else if (evt.which === 27) {
-          scope.matches = [];
+          evt.stopPropagation();
+
+          resetMatches();
           scope.$digest();
         }
       });
 
-      var tplElCompiled = $compile("<typeahead-popup matches='matches' active='activeIdx' select='select(activeIdx)' "+
-        "query='query'></typeahead-popup>")(scope);
-      element.after(tplElCompiled);
+      $document.bind('click', function(){
+        resetMatches();
+        scope.$digest();
+      });
+
+      element.after($compile(popUpEl)(scope));
     }
   };
 
@@ -170,6 +199,7 @@ angular.module('ui.bootstrap.typeahead', [])
         matches:'=',
         query:'=',
         active:'=',
+        position:'=',
         select:'&'
       },
       replace:true,
@@ -196,7 +226,12 @@ angular.module('ui.bootstrap.typeahead', [])
   })
 
   .filter('typeaheadHighlight', function() {
+
+    function escapeRegexp(queryToEscape) {
+      return queryToEscape.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1");
+    }
+
     return function(matchItem, query) {
-      return (query) ? matchItem.replace(new RegExp(query, 'gi'), '<strong>$&</strong>') : query;
+      return query ? matchItem.replace(new RegExp(escapeRegexp(query), 'gi'), '<strong>$&</strong>') : query;
     };
   });

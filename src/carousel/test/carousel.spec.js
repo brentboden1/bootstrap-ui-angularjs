@@ -63,6 +63,37 @@ describe('carousel', function() {
       var indicators = elm.find('ol.carousel-indicators > li');
       expect(indicators.length).toBe(3);
     });
+    
+    it('should hide navigation when only one slide', function () {
+      scope.slides=[{active:false,content:'one'}];
+      scope.$apply();
+      elm = $compile(
+          '<carousel interval="interval" no-transition="true">' +
+            '<slide ng-repeat="slide in slides" active="slide.active">' +
+              '{{slide.content}}' +
+            '</slide>' +
+          '</carousel>' 
+        )(scope);
+      var indicators = elm.find('ol.carousel-indicators > li');
+      expect(indicators.length).toBe(0);
+      
+      var navNext = elm.find('a.right');
+      expect(navNext.length).toBe(0);
+      
+      var navPrev = elm.find('a.left');
+      expect(navPrev.length).toBe(0);
+    });
+    
+    it('should show navigation when there are 3 slides', function () {  
+      var indicators = elm.find('ol.carousel-indicators > li');
+      expect(indicators.length).not.toBe(0);
+      
+      var navNext = elm.find('a.right');
+      expect(navNext.length).not.toBe(0);
+      
+      var navPrev = elm.find('a.left');
+      expect(navPrev.length).not.toBe(0);
+    });
 
     it('should go to next when clicking next button', function() {
       var navNext = elm.find('a.right');
@@ -173,6 +204,21 @@ describe('carousel', function() {
       expect(contents.eq(0).text()).toBe('new2');
       expect(contents.eq(0)).toHaveClass('active');
       expect(contents.eq(1).text()).toBe('new3');
+    });
+
+    it('should not change if next is clicked while transitioning', function() {
+      var carouselScope = elm.children().scope();
+      var next = elm.find('a.right');
+
+      testSlideActive(0);
+      carouselScope.$currentTransition = true;
+      next.click();
+
+      testSlideActive(0);
+
+      carouselScope.$currentTransition = null;
+      next.click();
+      testSlideActive(1);
     });
   });
 

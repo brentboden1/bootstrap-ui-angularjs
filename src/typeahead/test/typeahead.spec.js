@@ -142,16 +142,44 @@ describe('typeahead tests', function () {
     });
   });
 
+  describe('typeaheadHighlight', function () {
+
+    var highlightFilter;
+    beforeEach(inject(function (typeaheadHighlightFilter) {
+      highlightFilter = typeaheadHighlightFilter;
+    }));
+
+    it('should higlight a match', function () {
+      expect(highlightFilter('before match after', 'match')).toEqual('before <strong>match</strong> after');
+    });
+
+    it('should higlight a match with mixed case', function () {
+      expect(highlightFilter('before MaTch after', 'match')).toEqual('before <strong>MaTch</strong> after');
+    });
+
+    it('should higlight all matches', function () {
+      expect(highlightFilter('before MaTch after match', 'match')).toEqual('before <strong>MaTch</strong> after <strong>match</strong>');
+    });
+
+    it('should do nothing if no match', function () {
+      expect(highlightFilter('before match after', 'nomatch')).toEqual('before match after');
+    });
+
+    it('issue 316 - should work correctly for regexp reserved words', function () {
+      expect(highlightFilter('before (match after', '(match')).toEqual('before <strong>(match</strong> after');
+    });
+  });
+
   describe('typeahead', function () {
 
-    var $scope, $compile;
+    var $scope, $compile, $document;
     var changeInputValueTo;
 
-    beforeEach(inject(function (_$rootScope_, _$compile_, $sniffer) {
+    beforeEach(inject(function (_$rootScope_, _$compile_, _$document_, $sniffer) {
       $scope = _$rootScope_;
       $scope.source = ['foo', 'bar', 'baz'];
       $compile = _$compile_;
-
+      $document = _$document_;
       changeInputValueTo = function (element, value) {
         var inputEl = findInput(element);
         inputEl.val(value);
@@ -172,7 +200,7 @@ describe('typeahead tests', function () {
     };
 
     var findDropDown = function(element) {
-      return element.find('div.dropdown');
+      return element.find('ul.typeahead');
     };
 
     var findMatches = function(element) {
@@ -194,7 +222,7 @@ describe('typeahead tests', function () {
           this.message = function() {
             return "Expected '" + angular.mock.dump(this.actual) + "' to be closed.";
           };
-          return !typeaheadEl.hasClass('open') && findMatches(this.actual).length === 0;
+          return typeaheadEl.css('display')==='none' && findMatches(this.actual).length === 0;
 
         }, toBeOpenWithActive: function(noOfMatches, activeIdx) {
 
@@ -204,7 +232,7 @@ describe('typeahead tests', function () {
           this.message = function() {
             return "Expected '" + angular.mock.dump(this.actual) + "' to be opened.";
           };
-          return typeaheadEl.hasClass('open') && liEls.length === noOfMatches && $(liEls[activeIdx]).hasClass('active');
+          return typeaheadEl.css('display')==='block' && liEls.length === noOfMatches && $(liEls[activeIdx]).hasClass('active');
         }
       });
     });
@@ -215,6 +243,17 @@ describe('typeahead tests', function () {
       it('should be closed by default', function () {
         var element = prepareInputEl("<div><input ng-model='result' typeahead='item for item in source'></div>");
         expect(element).toBeClosed();
+      });
+
+      it('should correctly render initial state if the "as" keyword is used', function () {
+
+        $scope.states = [{code: 'AL', name: 'Alaska'}, {code: 'CL', name: 'California'}];
+        $scope.result = $scope.states[0];
+
+        var element = prepareInputEl("<div><input ng-model='result' typeahead='state as state.name for state in states'></div>");
+        var inputEl = findInput(element);
+
+        expect(inputEl.val()).toEqual('Alaska');
       });
 
       it('should not get open on model change', function () {
@@ -260,6 +299,33 @@ describe('typeahead tests', function () {
         var matchHighlight = findMatches(element).find('a').html();
         expect(matchHighlight).toEqual('prefix<strong>fo</strong>o');
       });
+
+      it('should by default bind view value to model even if not part of matches', function () {
+        var element = prepareInputEl("<div><input ng-model='result' typeahead='item for item in source | filter:$viewValue'></div>");
+        changeInputValueTo(element, 'not in matches');
+        expect($scope.result).toEqual('not in matches');
+      });
+
+      it('should support the editable property to limit model bindings to matches only', function () {
+        var element = prepareInputEl("<div><input ng-model='result' typeahead='item for item in source | filter:$viewValue' typeahead-editable='false'></div>");
+        changeInputValueTo(element, 'not in matches');
+        expect($scope.result).toEqual(undefined);
+      });
+
+      it('should bind loading indicator expression', inject(function ($timeout) {
+
+        $scope.isLoading = false;
+        $scope.loadMatches = function(viewValue) {
+          return $timeout(function() { return [];}, 1000);
+        };
+
+        var element = prepareInputEl("<div><input ng-model='result' typeahead='item for item in loadMatches()' typeahead-loading='isLoading'></div>");
+        changeInputValueTo(element, 'foo');
+
+        expect($scope.isLoading).toBeTruthy();
+        $timeout.flush();
+        expect($scope.isLoading).toBeFalsy();
+      }));
     });
 
     describe('selecting a match', function () {
@@ -315,6 +381,21 @@ describe('typeahead tests', function () {
 
         expect($scope.result).toEqual('AL');
         expect(inputEl.val()).toEqual('Alaska');
+      });
+    });
+
+    describe('regressions tests', function () {
+
+      it('issue 231 - closes matches popup on click outside typeahead', function () {
+        var element = prepareInputEl("<div><input ng-model='result' typeahead='item for item in source | filter:$viewValue'></div>");
+        var inputEl = findInput(element);
+
+        changeInputValueTo(element, 'b');
+
+        $document.find('body').click();
+        $scope.$digest();
+
+        expect(element).toBeClosed();
       });
     });
 

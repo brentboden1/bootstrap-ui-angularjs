@@ -6,7 +6,8 @@ angular.module('ui.bootstrap.pagination', [])
   firstText: 'First',
   previousText: 'Previous',
   nextText: 'Next',
-  lastText: 'Last'
+  lastText: 'Last',
+  rotate: true
 })
 
 .directive('pagination', ['paginationConfig', function(paginationConfig) {
@@ -29,6 +30,7 @@ angular.module('ui.bootstrap.pagination', [])
       var previousText = angular.isDefined(attrs.previousText) ? attrs.previousText : paginationConfig.previousText;
       var nextText = angular.isDefined(attrs.nextText) ? attrs.nextText : paginationConfig.nextText;
       var lastText = angular.isDefined(attrs.lastText) ? attrs.lastText : paginationConfig.lastText;
+      var rotate = angular.isDefined(attrs.rotate) ? scope.$eval(attrs.rotate) : paginationConfig.rotate;
 
       // Create page object used in template
       function makePage(number, text, isActive, isDisabled) {
@@ -43,22 +45,48 @@ angular.module('ui.bootstrap.pagination', [])
       scope.$watch('numPages + currentPage + maxSize', function() {
         scope.pages = [];
         
-        //set the default maxSize to numPages
-        var maxSize = ( scope.maxSize && scope.maxSize < scope.numPages ) ? scope.maxSize : scope.numPages;
-        var startPage = scope.currentPage - Math.floor(maxSize/2);
-        
-        //adjust the startPage within boundary
-        if(startPage < 1) {
-            startPage = 1;
-        }
-        if ((startPage + maxSize - 1) > scope.numPages) {
-            startPage = startPage - ((startPage + maxSize - 1) - scope.numPages );
+        // Default page limits
+        var startPage = 1, endPage = scope.numPages;
+        var isMaxSized = ( angular.isDefined(scope.maxSize) && scope.maxSize < scope.numPages );
+
+        // recompute if maxSize
+        if ( isMaxSized ) {
+          if ( rotate ) {
+            // Current page is displayed in the middle of the visible ones
+            startPage = Math.max(scope.currentPage - Math.floor(scope.maxSize/2), 1);
+            endPage   = startPage + scope.maxSize - 1;
+
+            // Adjust if limit is exceeded
+            if (endPage > scope.numPages) {
+              endPage   = scope.numPages;
+              startPage = endPage - scope.maxSize + 1;
+            }
+          } else {
+            // Visible pages are paginated with maxSize
+            startPage = ((Math.ceil(scope.currentPage / scope.maxSize) - 1) * scope.maxSize) + 1;
+
+            // Adjust last page if limit is exceeded
+            endPage = Math.min(startPage + scope.maxSize - 1, scope.numPages);
+          }
         }
 
         // Add page number links
-        for (var number = startPage, max = startPage + maxSize; number < max; number++) {
+        for (var number = startPage; number <= endPage; number++) {
           var page = makePage(number, number, scope.isActive(number), false);
           scope.pages.push(page);
+        }
+
+        // Add links to move between page sets
+        if ( isMaxSized && ! rotate ) {
+          if ( startPage > 1 ) {
+            var previousPageSet = makePage(startPage - 1, '...', false, false);
+            scope.pages.unshift(previousPageSet);
+          }
+
+          if ( endPage < scope.numPages ) {
+            var nextPageSet = makePage(endPage + 1, '...', false, false);
+            scope.pages.push(nextPageSet);
+          }
         }
 
         // Add previous & next links
@@ -78,7 +106,6 @@ angular.module('ui.bootstrap.pagination', [])
           var lastPage = makePage(scope.numPages, lastText, false, scope.noNext());
           scope.pages.push(lastPage);
         }
-
 
         if ( scope.currentPage > scope.numPages ) {
           scope.selectPage(scope.numPages);
